@@ -2,6 +2,7 @@ package golangvalidation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
@@ -221,6 +222,53 @@ func TestBasicCollection(t *testing.T) {
 	}
 }
 
+func TestBasicMap(t *testing.T) {
+	type Address struct {
+		City    string `validate:"required"`
+		Country string `validate:"required"`
+	}
+
+	type User struct {
+		Id        string         `validate:"required"`
+		Name      string         `validate:"required"`
+		Addresses []Address      `validate:"required,dive"`
+		Hobbies   []string       `validate:"required,dive,required,min=3"`
+		Wallet    map[string]int `validate:"dive,keys,required,endkeys,required,gt=1000"`
+	}
+
+	validate := validator.New()
+	request := User{
+		Id:   "",
+		Name: "",
+		Addresses: []Address{
+			{
+				City:    "",
+				Country: "",
+			},
+			{
+				City:    "",
+				Country: "",
+			},
+		},
+		Hobbies: []string{
+			"Football",
+			"Coding",
+			"X",
+			"",
+		},
+		Wallet: map[string]int{
+			"BNI": 1000000,
+			"BRI": 0,
+			"":    1001,
+		},
+	}
+
+	err := validate.Struct(request)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
 func TestMap(t *testing.T) {
 	type Address struct {
 		City    string `validate:"required"`
@@ -236,7 +284,7 @@ func TestMap(t *testing.T) {
 		Name      string            `validate:"required"`
 		Addresses []Address         `validate:"required,dive"`
 		Hobbies   []string          `validate:"required,dive,required,min=3"`
-		Schools   map[string]School `validate:"dive,keys,required,min=2,endkeys,dive"`
+		Schools   map[string]School `validate:"dive,keys,required,min=2,endkeys,required"`
 	}
 
 	validate := validator.New()
@@ -261,15 +309,70 @@ func TestMap(t *testing.T) {
 		},
 		Schools: map[string]School{
 			"SD": {
-				Name: "SD Indonesia",
+				"SD Tangerang",
 			},
 			"SMP": {
-				Name: "",
+				"",
 			},
-			"": {
-				Name: "",
-			},
+			"": {""},
 		},
+	}
+
+	err := validate.Struct(request)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
+func TestAlias(t *testing.T) {
+	validate := validator.New()
+	validate.RegisterAlias("varchar", "required,max=255")
+
+	type Seller struct {
+		Id     string `validate:"varchar,min=5"`
+		Name   string `validate:"varchar"`
+		Owner  string `validate:"varchar"`
+		Slogan string `validate:"varchar"`
+	}
+
+	seller := Seller{
+		Id:     "123",
+		Name:   "",
+		Owner:  "",
+		Slogan: "",
+	}
+
+	err := validate.Struct(seller)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
+func MustValidUsername(field validator.FieldLevel) bool {
+	value, ok := field.Field().Interface().(string)
+	if ok {
+		if value != strings.ToUpper(value) {
+			return false
+		}
+		if len(value) < 5 {
+			return false
+		}
+	}
+	return true
+}
+
+func TestCostumValidationFunction(t *testing.T) {
+	validate := validator.New()
+	validate.RegisterValidation("username", MustValidUsername)
+
+	type LoginRequest struct {
+		Username string `validate:"required,username"`
+		Password string `validate:"required"`
+	}
+
+	request := LoginRequest{
+		Username: "SEPTIAN",
+		Password: "",
 	}
 
 	err := validate.Struct(request)
